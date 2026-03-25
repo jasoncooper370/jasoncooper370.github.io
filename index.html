@@ -1,157 +1,169 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trip Planner Pro - Advanced</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; height: 100vh; background: #f0f2f5; overflow: hidden; }
-        
-        #login-screen { position: fixed; inset: 0; background: #2c3e50; display: flex; align-items: center; justify-content: center; z-index: 1000; color: white; }
-        .login-card { background: white; color: #333; padding: 40px; border-radius: 15px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.3); width: 300px; }
-        
-        #main-app { display: none; width: 100%; height: 100%; }
-        .sidebar { width: 380px; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
-        .map-area { flex-grow: 1; background: #eee; }
-        
-        .header { padding: 20px; border-bottom: 1px solid #eee; background: #007aff; color: white; }
-        .list-container { flex-grow: 1; overflow-y: auto; padding: 15px; }
-        
-        /* Dynamic Card Styles */
-        .location-item { 
-            background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 12px; 
-            border-radius: 10px; cursor: pointer; transition: 0.2s; position: relative;
-        }
-        .location-item:hover { border-color: #007aff; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .time-badge { position: absolute; top: 10px; right: 10px; background: #eee; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
-        .type-tag { font-size: 10px; text-transform: uppercase; color: #007aff; font-weight: bold; display: block; margin-bottom: 5px; }
-        .detail-box { margin-top: 8px; font-size: 13px; color: #555; padding-top: 8px; border-top: 1px dashed #ddd; }
-        
-        .controls { padding: 20px; border-top: 1px solid #eee; background: #fafafa; }
-        input, select, textarea { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        button { padding: 10px; cursor: pointer; border-radius: 5px; border: none; background: #007aff; color: white; font-weight: bold; width: 100%; }
-        iframe { width: 100%; height: 100%; border: none; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trip Planner Pro</title>
+
+<style>
+body { font-family: 'Segoe UI', Tahoma; margin: 0; display: flex; height: 100vh; background: #f0f2f5; }
+#login-screen { position: fixed; inset: 0; background: #2c3e50; display: flex; align-items: center; justify-content: center; color: white; }
+.login-card { background: white; color: #333; padding: 40px; border-radius: 15px; width: 300px; text-align: center; }
+
+#main-app { display: none; width: 100%; }
+.sidebar { width: 380px; background: white; display: flex; flex-direction: column; }
+.header { padding: 20px; background: #007aff; color: white; }
+.list-container { flex-grow: 1; overflow-y: auto; padding: 15px; }
+
+.location-item {
+    background: white; border: 1px solid #ddd;
+    padding: 15px; margin-bottom: 10px;
+    border-radius: 10px; position: relative; cursor: pointer;
+}
+
+.time-badge { position: absolute; top: 10px; right: 10px; font-size: 11px; }
+.type-tag { font-size: 10px; color: #007aff; }
+
+.controls { padding: 20px; }
+input, select, textarea { width: 100%; margin-bottom: 10px; padding: 8px; }
+button { width: 100%; padding: 10px; background: #007aff; color: white; border: none; }
+</style>
 </head>
+
 <body>
 
-    <div id="login-screen">
-        <div class="login-card">
-            <h1>Trip Planner</h1>
-            <input type="text" id="username-input" placeholder="Username">
-            <input type="password" id="password-input" placeholder="Password">
-            <button onclick="handleAuth()">Login / Sign Up</button>
+<div id="login-screen">
+    <div class="login-card">
+        <h2>Trip Planner</h2>
+        <input id="username-input" placeholder="Username">
+        <input id="password-input" type="password" placeholder="Password">
+        <button onclick="handleAuth()">Login</button>
+    </div>
+</div>
+
+<div id="main-app">
+    <div class="sidebar">
+        <div class="header">
+            <h2 id="display-user"></h2>
+        </div>
+
+        <div id="location-list" class="list-container"></div>
+
+        <div class="controls">
+            <input id="new-name" placeholder="Place name">
+            <select id="new-type">
+                <option>Restaurant</option>
+                <option>Experience</option>
+                <option>General</option>
+            </select>
+            <input type="time" id="new-time">
+            <textarea id="new-details" placeholder="Details"></textarea>
+            <button onclick="addLocation()">Add</button>
         </div>
     </div>
+</div>
 
-    <div id="main-app">
-        <div class="sidebar">
-            <div class="header">
-                <h2 id="display-user">My Trip</h2>
-                <small>Plan your schedule and view details</small>
+<script>
+let currentUser = "";
+
+let db = JSON.parse(localStorage.getItem('trip_db_v3')) || {
+    users: {},
+    locations: []
+};
+
+function handleAuth() {
+    const user = username-input.value.trim();
+    const pass = password-input.value.trim();
+
+    if (!db.users[user]) {
+        db.users[user] = { password: pass };
+        saveToDB();
+    }
+
+    if (db.users[user].password === pass) {
+        currentUser = user;
+        login-screen.style.display = "none";
+        main-app.style.display = "flex";
+        display-user.innerText = user + "'s Trip";
+        renderLocations();
+    }
+}
+
+function renderLocations() {
+    const container = document.getElementById('location-list');
+    container.innerHTML = "";
+
+    const sorted = db.locations.sort((a, b) => a.time.localeCompare(b.time));
+
+    sorted.forEach((loc, index) => {
+        const div = document.createElement('div');
+        div.className = "location-item";
+
+        // Open Google Maps in new tab
+        div.onclick = (e) => {
+            if (e.target.classList.contains("delete-btn")) return;
+
+            window.open(
+                "https://www.google.com/maps/search/?api=1&query=" 
+                + encodeURIComponent(loc.name),
+                "_blank"
+            );
+        };
+
+        const detailLabel = loc.type === "Restaurant" ? "📜 MENU" : "🎢 ACTIVITY";
+
+        div.innerHTML = `
+            <span class="time-badge">${loc.time}</span>
+            <span class="type-tag">${loc.type}</span>
+            <strong>${loc.name}</strong>
+
+            <button class="delete-btn" style="
+                position:absolute;
+                bottom:10px;
+                right:10px;
+                background:#ff3b30;
+                color:white;
+                border:none;
+                padding:5px 8px;
+                border-radius:5px;
+                font-size:12px;
+                cursor:pointer;
+            ">Delete</button>
+
+            <div class="detail-box">
+                <small><strong>${detailLabel}:</strong></small><br>
+                ${loc.details}
             </div>
+        `;
 
-            <div id="location-list" class="list-container"></div>
+        // Delete
+        div.querySelector(".delete-btn").onclick = () => {
+            db.locations.splice(index, 1);
+            saveToDB();
+            renderLocations();
+        };
 
-            <div class="controls">
-                <input type="text" id="new-name" placeholder="Name (e.g. Pizza Express)">
-                <div style="display: flex; gap: 5px;">
-                    <select id="new-type">
-                        <option value="Restaurant">🍴 Restaurant</option>
-                        <option value="Experience">🎡 Experience</option>
-                        <option value="General">📍 General</option>
-                    </select>
-                    <input type="time" id="new-time">
-                </div>
-                <textarea id="new-details" placeholder="Menu items or activity description..."></textarea>
-                <button onclick="addLocation()">+ Add to Itinerary</button>
-                <button onclick="location.reload()" style="margin-top: 8px; background: #666;">Logout</button>
-            </div>
-        </div>
+        container.appendChild(div);
+    });
+}
 
-        <div class="map-area">
-            <iframe id="google-map" src="https://www.google.com/maps?q=London&output=embed"></iframe>
-        </div>
-    </div>
+function addLocation() {
+    const name = new-name.value;
+    const type = new-type.value;
+    const time = new-time.value;
+    const details = new-details.value;
 
-    <script>
-        let currentUser = "";
-        let db = JSON.parse(localStorage.getItem('trip_db_v2')) || {};
+    if (name && time) {
+        db.locations.push({ name, type, time, details });
+        saveToDB();
+        renderLocations();
+    }
+}
 
-        function handleAuth() {
-            const user = document.getElementById('username-input').value.trim();
-            const pass = document.getElementById('password-input').value.trim();
-            if (!user || !pass) return;
+function saveToDB() {
+    localStorage.setItem('trip_db_v3', JSON.stringify(db));
+}
+</script>
 
-            if (!db[user]) {
-                db[user] = { password: pass, locations: [
-                    { name: "Llandudno Pier", type: "Experience", time: "14:00", details: "Walking, arcade games, and ice cream." },
-                    { name: "The Seahorse", type: "Restaurant", time: "19:00", details: "Menu: Fresh Sea Bass, Lobster, White Wine." }
-                ]};
-                saveToDB();
-            }
-            
-            if (db[user].password === pass) {
-                currentUser = user;
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('main-app').style.display = 'flex';
-                document.getElementById('display-user').innerText = user + "'s Trip";
-                renderLocations();
-            }
-        }
-
-        function renderLocations() {
-            const container = document.getElementById('location-list');
-            container.innerHTML = "";
-
-            // Sort by time
-            const sorted = db[currentUser].locations.sort((a, b) => a.time.localeCompare(b.time));
-
-            sorted.forEach((loc) => {
-                const div = document.createElement('div');
-                div.className = "location-item";
-                div.onclick = () => {
-                    const map = document.getElementById('google-map');
-                    map.src = `https://google.com{encodeURIComponent(loc.name)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
-                };
-
-                const detailLabel = loc.type === "Restaurant" ? "📜 MENU" : "🎢 ACTIVITY";
-
-                div.innerHTML = `
-                    <span class="time-badge">${loc.time}</span>
-                    <span class="type-tag">${loc.type}</span>
-                    <strong>${loc.name}</strong>
-                    <div class="detail-box">
-                        <small><strong>${detailLabel}:</strong></small><br>
-                        ${loc.details}
-                    </div>
-                `;
-                container.appendChild(div);
-            });
-        }
-
-        function addLocation() {
-            const name = document.getElementById('new-name').value;
-            const type = document.getElementById('new-type').value;
-            const time = document.getElementById('new-time').value;
-            const details = document.getElementById('new-details').value;
-
-            if (name && time) {
-                db[currentUser].locations.push({ name, type, time, details });
-                saveToDB();
-                renderLocations();
-                
-                // Clear fields
-                document.getElementById('new-name').value = "";
-                document.getElementById('new-details').value = "";
-            } else {
-                alert("Please enter at least a name and time!");
-            }
-        }
-
-        function saveToDB() {
-            localStorage.setItem('trip_db_v2', JSON.stringify(db));
-        }
-    </script>
 </body>
 </html>
