@@ -5,22 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trip Planner Pro</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma; margin: 0; display: flex; height: 100vh; background: #f0f2f5; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }
+        
         #login-screen { position: fixed; inset: 0; background: #2c3e50; display: flex; align-items: center; justify-content: center; color: white; z-index: 100; }
         .login-card { background: white; color: #333; padding: 40px; border-radius: 15px; width: 300px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        #main-app { display: none; width: 100%; }
-        .sidebar { width: 380px; background: white; display: flex; flex-direction: column; border-right: 1px solid #ddd; }
-        .header { padding: 20px; background: #007aff; color: white; }
-        .list-container { flex-grow: 1; overflow-y: auto; padding: 15px; }
-        .location-item { background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 10px; position: relative; cursor: pointer; transition: background 0.2s; }
-        .location-item:hover { background: #f9f9f9; }
-        .time-badge { position: absolute; top: 10px; right: 10px; font-size: 11px; font-weight: bold; color: #666; }
+        
+        #main-app { display: none; flex-direction: column; height: 100vh; width: 100%; }
+        
+        .header { padding: 20px; background: #007aff; color: white; display: flex; justify-content: space-between; align-items: center; }
+        .header h2 { margin: 0; font-size: 1.5rem; }
+
+        .content-area { display: flex; flex: 1; overflow: hidden; }
+        
+        /* This makes the list cover the main area */
+        .list-container { flex: 1; overflow-y: auto; padding: 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); grid-auto-rows: max-content; gap: 15px; }
+        
+        .location-item { background: white; border: 1px solid #ddd; padding: 15px; border-radius: 10px; position: relative; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; height: fit-content; }
+        .location-item:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        
+        .time-badge { position: absolute; top: 10px; right: 10px; font-size: 11px; font-weight: bold; background: #eee; padding: 2px 6px; border-radius: 4px; }
         .type-tag { font-size: 10px; color: #007aff; text-transform: uppercase; font-weight: bold; }
-        .controls { padding: 20px; border-top: 1px solid #eee; }
-        input, select, textarea { width: 100%; margin-bottom: 10px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #007aff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        
+        .controls { width: 350px; background: white; padding: 20px; border-left: 1px solid #ddd; display: flex; flex-direction: column; }
+        
+        input, select, textarea { width: 100%; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        button { width: 100%; padding: 12px; background: #007aff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
         button:hover { background: #0056b3; }
-        .detail-box { margin-top: 10px; font-size: 13px; color: #555; }
+        
+        .delete-btn { background: #ff3b30; margin-top: 10px; padding: 5px; font-size: 12px; }
+        .detail-box { margin-top: 10px; font-size: 13px; color: #555; border-top: 1px solid #eee; pt: 10px; }
+
+        @media (max-width: 768px) {
+            .content-area { flex-direction: column-reverse; }
+            .controls { width: 100%; border-left: none; border-top: 1px solid #ddd; }
+        }
     </style>
 </head>
 <body>
@@ -35,14 +53,16 @@
 </div>
 
 <div id="main-app">
-    <div class="sidebar">
-        <div class="header">
-            <h2 id="display-user"></h2>
-        </div>
+    <div class="header">
+        <h2 id="display-user"></h2>
+        <button onclick="location.reload()" style="width: auto; background: rgba(255,255,255,0.2); padding: 5px 15px;">Logout</button>
+    </div>
 
+    <div class="content-area">
         <div id="location-list" class="list-container"></div>
 
         <div class="controls">
+            <h3>Add New Stop</h3>
             <input id="new-name" placeholder="Place name (e.g. Eiffel Tower)">
             <select id="new-type">
                 <option>Restaurant</option>
@@ -50,7 +70,7 @@
                 <option>General</option>
             </select>
             <input type="time" id="new-time">
-            <textarea id="new-details" placeholder="Details or Notes"></textarea>
+            <textarea id="new-details" placeholder="Details or Notes" rows="4"></textarea>
             <button onclick="addLocation()">Add to Itinerary</button>
         </div>
     </div>
@@ -59,14 +79,12 @@
 <script>
 let currentUser = "";
 
-// Load DB from localStorage or init empty
 let db = JSON.parse(localStorage.getItem('trip_db_v3')) || {
     users: {},
     locations: []
 };
 
 function handleAuth() {
-    // FIX: Using document.getElementById to avoid hyphen-subtraction errors
     const user = document.getElementById('username-input').value.trim();
     const pass = document.getElementById('password-input').value.trim();
 
@@ -75,13 +93,11 @@ function handleAuth() {
         return;
     }
 
-    // Initialize user if not exists (Sign-up logic)
     if (!db.users[user]) {
         db.users[user] = { password: pass };
         saveToDB();
     }
 
-    // Validate password
     if (db.users[user].password === pass) {
         currentUser = user;
         document.getElementById('login-screen').style.display = "none";
@@ -97,21 +113,17 @@ function renderLocations() {
     const container = document.getElementById('location-list');
     container.innerHTML = "";
 
-    // Sort locations by time
     const sorted = db.locations.sort((a, b) => a.time.localeCompare(b.time));
 
     sorted.forEach((loc, index) => {
         const div = document.createElement('div');
         div.className = "location-item";
         
-        // Open Google Maps in new tab on click
+        // FIX: Correct Google Maps Search URL
         div.onclick = (e) => {
             if (e.target.classList.contains("delete-btn")) return;
-            window.open(
-                "https://google.com" 
-                + encodeURIComponent(loc.name),
-                "_blank"
-            );
+            const mapUrl = `https://google.com{encodeURIComponent(loc.name)}`;
+            window.open(mapUrl, "_blank");
         };
 
         const detailLabel = loc.type === "Restaurant" ? "📜 MENU/NOTES" : "🎢 ACTIVITY";
@@ -120,27 +132,15 @@ function renderLocations() {
             <span class="time-badge">${loc.time}</span>
             <span class="type-tag">${loc.type}</span>
             <br><strong>${loc.name}</strong>
-            <button class="delete-btn" style="
-                position:absolute;
-                bottom:10px;
-                right:10px;
-                background:#ff3b30;
-                color:white;
-                border:none;
-                padding:5px 8px;
-                border-radius:5px;
-                font-size:12px;
-                cursor:pointer;
-            ">Delete</button>
             <div class="detail-box">
                 <small><strong>${detailLabel}:</strong></small><br>
                 ${loc.details || 'No additional details'}
             </div>
+            <button class="delete-btn">Delete</button>
         `;
 
-        // Delete button logic
         div.querySelector(".delete-btn").onclick = (e) => {
-            e.stopPropagation(); // Stop the click from opening Google Maps
+            e.stopPropagation(); 
             db.locations.splice(index, 1);
             saveToDB();
             renderLocations();
@@ -167,7 +167,6 @@ function addLocation() {
         saveToDB();
         renderLocations();
 
-        // Clear inputs
         nameInput.value = "";
         timeInput.value = "";
         detailsInput.value = "";
