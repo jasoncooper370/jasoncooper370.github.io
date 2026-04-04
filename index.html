@@ -6,34 +6,149 @@
     <title>Trip Planner Pro</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }
-        
         #login-screen { position: fixed; inset: 0; background: #2c3e50; display: flex; align-items: center; justify-content: center; color: white; z-index: 100; }
         .login-card { background: white; color: #333; padding: 40px; border-radius: 15px; width: 300px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        
         #main-app { display: none; flex-direction: column; height: 100vh; width: 100%; }
-        
         .header { padding: 20px; background: #007aff; color: white; display: flex; justify-content: space-between; align-items: center; }
         .header h2 { margin: 0; font-size: 1.5rem; }
-
         .content-area { display: flex; flex: 1; overflow: hidden; }
         
-        /* This makes the list cover the main area */
+        /* This grid layout makes locations cover the whole tab */
         .list-container { flex: 1; overflow-y: auto; padding: 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); grid-auto-rows: max-content; gap: 15px; }
         
         .location-item { background: white; border: 1px solid #ddd; padding: 15px; border-radius: 10px; position: relative; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; height: fit-content; }
         .location-item:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        
         .time-badge { position: absolute; top: 10px; right: 10px; font-size: 11px; font-weight: bold; background: #eee; padding: 2px 6px; border-radius: 4px; }
         .type-tag { font-size: 10px; color: #007aff; text-transform: uppercase; font-weight: bold; }
-        
         .controls { width: 350px; background: white; padding: 20px; border-left: 1px solid #ddd; display: flex; flex-direction: column; }
-        
         input, select, textarea { width: 100%; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
         button { width: 100%; padding: 12px; background: #007aff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
         button:hover { background: #0056b3; }
+        .delete-btn { background: #ff3b30; margin-top: 15px; padding: 8px; font-size: 12px; }
+        .detail-box { margin-top: 10px; font-size: 13px; color: #555; border-top: 1px solid #eee; padding-top: 10px; }
+
+        @media (max-width: 768px) {
+            .content-area { flex-direction: column-reverse; }
+            .controls { width: 100%; border-left: none; border-top: 1px solid #ddd; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="login-card">
+        <h2>Trip Planner</h2>
+        <input id="username-input" placeholder="Username">
+        <input id="password-input" type="password" placeholder="Password">
+        <button onclick="handleAuth()">Login / Sign Up</button>
+    </div>
+</div>
+
+<div id="main-app">
+    <div class="header">
+        <h2 id="display-user"></h2>
+        <button onclick="location.reload()" style="width: auto; background: rgba(255,255,255,0.2); padding: 5px 15px;">Logout</button>
+    </div>
+
+    <div class="content-area">
+        <div id="location-list" class="list-container"></div>
+
+        <div class="controls">
+            <h3>Add New Stop</h3>
+            <input id="new-name" placeholder="Place name (e.g. Eiffel Tower)">
+            <select id="new-type">
+                <option>Restaurant</option>
+                <option>Experience</option>
+                <option>General</option>
+            </select>
+            <input type="time" id="new-time">
+            <textarea id="new-details" placeholder="Details or Notes" rows="4"></textarea>
+            <button onclick="addLocation()">Add to Itinerary</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentUser = "";
+let db = JSON.parse(localStorage.getItem('trip_db_v3')) || { users: {}, locations: [] };
+
+function handleAuth() {
+    const user = document.getElementById('username-input').value.trim();
+    const pass = document.getElementById('password-input').value.trim();
+    if (!user || !pass) { alert("Please enter both username and password"); return; }
+    if (!db.users[user]) { db.users[user] = { password: pass }; saveToDB(); }
+    if (db.users[user].password === pass) {
+        currentUser = user;
+        document.getElementById('login-screen').style.display = "none";
+        document.getElementById('main-app').style.display = "flex";
+        document.getElementById('display-user').innerText = user + "'s Trip";
+        renderLocations();
+    } else { alert("Incorrect password"); }
+}
+
+function renderLocations() {
+    const container = document.getElementById('location-list');
+    container.innerHTML = "";
+    const sorted = db.locations.sort((a, b) => a.time.localeCompare(b.time));
+
+    sorted.forEach((loc, index) => {
+        const div = document.createElement('div');
+        div.className = "location-item";
         
-        .delete-btn { background: #ff3b30; margin-top: 10px; padding: 5px; font-size: 12px; }
-        .detail-box { margin-top: 10px; font-size: 13px; color: #555; border-top: 1px solid #eee; pt: 10px; }
+        // FIXED: The window.open logic below to prevent "Safari Can't Find Server"
+        div.onclick = (e) => {
+            if (e.target.classList.contains("delete-btn")) return;
+            // This search URL format is required for Google Maps to actually find the place
+            const mapUrl = "https://google.com" + encodeURIComponent(loc.name);
+            window.open(mapUrl, "_blank");
+        };
+
+        const detailLabel = loc.type === "Restaurant" ? "📜 MENU/NOTES" : "🎢 ACTIVITY";
+        div.innerHTML = `
+            <span class="time-badge">${loc.time}</span>
+            <span class="type-tag">${loc.type}</span>
+            <br><strong>${loc.name}</strong>
+            <div class="detail-box">
+                <small><strong>${detailLabel}:</strong></small><br>
+                ${loc.details || 'No additional details'}
+            </div>
+            <button class="delete-btn">Delete Stop</button>
+        `;
+
+        div.querySelector(".delete-btn").onclick = (e) => {
+            e.stopPropagation(); 
+            db.locations.splice(index, 1);
+            saveToDB();
+            renderLocations();
+        };
+        container.appendChild(div);
+    });
+}
+
+function addLocation() {
+    const nameInput = document.getElementById('new-name');
+    const typeInput = document.getElementById('new-type');
+    const timeInput = document.getElementById('new-time');
+    const detailsInput = document.getElementById('new-details');
+
+    if (nameInput.value && timeInput.value) {
+        db.locations.push({ 
+            name: nameInput.value, 
+            type: typeInput.value, 
+            time: timeInput.value, 
+            details: detailsInput.value 
+        });
+        saveToDB();
+        renderLocations();
+        nameInput.value = ""; timeInput.value = ""; detailsInput.value = "";
+    } else { alert("Please enter a name and a time."); }
+}
+
+function saveToDB() { localStorage.setItem('trip_db_v3', JSON.stringify(db)); }
+</script>
+
+</body>
+</html>
 
         @media (max-width: 768px) {
             .content-area { flex-direction: column-reverse; }
